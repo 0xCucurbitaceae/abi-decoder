@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  OpenZeppelinABIs,
-} from '../utils/abis';
+import { Interface } from 'ethers';
+import { OpenZeppelinABIs } from '../utils/abis';
 
 interface ABIInputProps {
   abi: string;
@@ -12,14 +11,51 @@ type ABIOption = 'custom' | keyof typeof OpenZeppelinABIs;
 
 const ABIInput: React.FC<ABIInputProps> = ({ abi, setAbi }) => {
   const [selectedABI, setSelectedABI] = useState<ABIOption>('custom');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Update the ABI when a predefined one is selected
   useEffect(() => {
     if (selectedABI !== 'custom') {
       const selectedAbiContent = OpenZeppelinABIs[selectedABI];
       setAbi(JSON.stringify(selectedAbiContent, null, 2));
+      setValidationError(null); // Clear validation errors when selecting a predefined ABI
     }
   }, [selectedABI, setAbi]);
+
+  // Validate ABI whenever it changes
+  useEffect(() => {
+    if (abi.trim() === '') {
+      setValidationError(null);
+      return;
+    }
+
+    try {
+      // Try to parse the ABI as JSON
+      const parsedAbi = JSON.parse(abi);
+
+      // Check if it's an array
+      if (!Array.isArray(parsedAbi)) {
+        setValidationError(
+          'ABI must be an array of function/event definitions'
+        );
+        return;
+      }
+
+      // Try to create an ethers Interface with the ABI to validate it
+      try {
+        new Interface(parsedAbi);
+        setValidationError(null); // Valid ABI
+      } catch (error) {
+        setValidationError(
+          `Invalid ABI format: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`
+        );
+      }
+    } catch (error) {
+      setValidationError('Invalid JSON format');
+    }
+  }, [abi]);
 
   const handleABIChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedABI(e.target.value as ABIOption);
@@ -51,6 +87,16 @@ const ABIInput: React.FC<ABIInputProps> = ({ abi, setAbi }) => {
     setSelectedABI('custom'); // Switch to custom when manually editing
   };
 
+  const getTextAreaBorderClass = () => {
+    if (validationError) {
+      return 'border-red-500';
+    }
+    if (abi.trim() !== '' && !validationError) {
+      return 'border-green-500';
+    }
+    return 'border-gray-300';
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -64,7 +110,7 @@ const ABIInput: React.FC<ABIInputProps> = ({ abi, setAbi }) => {
           Paste from Clipboard
         </button>
       </div>
-      
+
       <div className="w-full">
         <select
           id="abi-select"
@@ -99,14 +145,20 @@ const ABIInput: React.FC<ABIInputProps> = ({ abi, setAbi }) => {
           </optgroup>
         </select>
       </div>
-      
-      <textarea
-        id="abi-input"
-        value={abi}
-        onChange={handleTextAreaChange}
-        className="w-full h-64 p-4 border border-gray-300 rounded-md font-mono text-sm resize-none"
-        placeholder="Paste your contract ABI here (JSON format)"
-      />
+
+      <div className="space-y-2">
+        <textarea
+          id="abi-input"
+          value={abi}
+          onChange={handleTextAreaChange}
+          className={`w-full h-64 p-4 border rounded-md font-mono text-sm resize-none ${getTextAreaBorderClass()}`}
+          placeholder="Paste your contract ABI here (JSON format)"
+        />
+
+        {validationError && (
+          <div className="text-red-500 text-sm">{validationError}</div>
+        )}
+      </div>
     </div>
   );
 };

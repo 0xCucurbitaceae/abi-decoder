@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Interface } from 'ethers';
 import ABIInput from '../components/ABIInput';
 import ErrorDataInput from '../components/ErrorDataInput';
@@ -11,6 +11,36 @@ export default function Home() {
   const [errorData, setErrorData] = useState<string>('');
   const [decodedError, setDecodedError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isAbiValid, setIsAbiValid] = useState<boolean>(false);
+
+  // Validate ABI whenever it changes
+  useEffect(() => {
+    if (!abi.trim()) {
+      setIsAbiValid(false);
+      return;
+    }
+
+    try {
+      // Try to parse the ABI as JSON
+      const parsedAbi = JSON.parse(abi);
+      
+      // Check if it's an array
+      if (!Array.isArray(parsedAbi)) {
+        setIsAbiValid(false);
+        return;
+      }
+      
+      // Try to create an ethers Interface with the ABI to validate it
+      try {
+        new Interface(parsedAbi);
+        setIsAbiValid(true); // Valid ABI
+      } catch {
+        setIsAbiValid(false);
+      }
+    } catch {
+      setIsAbiValid(false);
+    }
+  }, [abi]);
 
   const decodeError = () => {
     try {
@@ -19,6 +49,10 @@ export default function Home() {
       // Validate inputs
       if (!abi.trim()) {
         throw new Error('ABI is required');
+      }
+      
+      if (!isAbiValid) {
+        throw new Error('Please provide a valid ABI');
       }
       
       if (!errorData.trim()) {
